@@ -1,0 +1,30 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { EmptyChannelTimer } from '../src/sessions/empty-channel.js';
+afterEach(() => vi.useRealTimers());
+it('stops only after 30 continuous seconds with no humans and cancels on return', () => {
+  vi.useFakeTimers();
+  let humans = 0;
+  const stop = vi.fn();
+  const timer = new EmptyChannelTimer(() => humans === 0, stop);
+  timer.update();
+  vi.advanceTimersByTime(29_999);
+  expect(stop).not.toHaveBeenCalled();
+  humans = 1;
+  timer.update();
+  vi.advanceTimersByTime(30_000);
+  expect(stop).not.toHaveBeenCalled();
+  humans = 0;
+  timer.update();
+  vi.advanceTimersByTime(30_000);
+  expect(stop).toHaveBeenCalledOnce();
+});
+it('rechecks membership on expiry even if a join event was missed', () => {
+  vi.useFakeTimers();
+  let empty = true;
+  const stop = vi.fn();
+  const timer = new EmptyChannelTimer(() => empty, stop);
+  timer.update();
+  empty = false;
+  vi.advanceTimersByTime(30_000);
+  expect(stop).not.toHaveBeenCalled();
+});

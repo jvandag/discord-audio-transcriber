@@ -1,0 +1,14 @@
+{
+  "aliasPermissions": "anyone",
+  "defaultModel": "base.en",
+  "defaultLanguage": "en",
+  "allowedLanguages": ["en", "auto"],
+  "dataDirectory": "data",
+  "modelsDirectory": "models",
+  "whisperThreads": 4,
+  "chunkSeconds": 20,
+  "silenceMilliseconds": 800,
+  "maxPendingAudioMegabytes": 16384,
+  "transcriptionTimeoutSeconds": 600,
+  "retentionHours": 24
+}
