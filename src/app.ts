@@ -8,6 +8,10 @@ import { TranscriptionQueue } from './transcription/queue.js';
 import { WhisperTranscriber } from './transcription/whisper.js';
 import { installInteractions } from './discord/interactions.js';
 import { normalizeModel, validateLanguage } from './transcription/models.js';
+import { ReportManager } from './reports/manager.js';
+import { GoogleReportDocuments, googleDocsRequest } from './reports/google-docs.js';
+import { AIReportGenerator } from './reports/providers.js';
+import { DiscordReportNotifier } from './reports/discord.js';
 export function createApp() {
   const config = loadConfig();
   normalizeModel(config.defaultModel);
@@ -25,6 +29,13 @@ export function createApp() {
     manager.jobChanged(id),
   );
   const manager = new SessionManager(config, store, queue, gateway);
-  installInteractions(client, config, store, manager);
-  return { client, store, manager, queue };
+  const reports = new ReportManager(
+    config.reports,
+    store,
+    new GoogleReportDocuments(googleDocsRequest(config.reports.requestTimeoutSeconds)),
+    new AIReportGenerator(),
+    new DiscordReportNotifier(client, store),
+  );
+  installInteractions(client, config, store, manager, reports);
+  return { client, store, manager, queue, reports };
 }

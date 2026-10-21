@@ -7,6 +7,7 @@ import type { RecordingGateway } from '../sessions/ports.js';
 import { AudioCapture } from '../audio/capture.js';
 import { splitTranscript } from '../transcripts/render.js';
 import { controlView } from './views.js';
+import { reportControls, reportDisclosure } from '../reports/discord.js';
 
 export class DiscordGateway implements RecordingGateway {
   constructor(
@@ -138,8 +139,20 @@ export class DiscordGateway implements RecordingGateway {
     const limit = 8 * 1024 * 1024 - 1024;
     const files = splitTranscript(transcript, limit);
     for (let i = 0; i < files.length; i++) {
-      await channel.send({
-        content: `Transcript ${session.id}${files.length > 1 ? ` — part ${i + 1}/${files.length}` : ''}`,
+      if (this.store.transcriptMessage(session.id, i)) continue;
+      let report = {};
+      let disclosure = '';
+      if (i === files.length - 1 && this.config.reports.enabled) {
+        try {
+          disclosure = `\n${reportDisclosure(this.config.reports, session.guildId)}`;
+          report = reportControls(session.id, this.config.reports, this.store.report(session.id));
+        } catch {
+          disclosure =
+            '\nMeeting reports are enabled but this server’s report configuration is incomplete.';
+        }
+      }
+      const message = await channel.send({
+        content: `Transcript ${session.id}${files.length > 1 ? ` — part ${i + 1}/${files.length}` : ''}${disclosure}`,
         files: [
           {
             attachment: files[i]!,
@@ -147,7 +160,9 @@ export class DiscordGateway implements RecordingGateway {
           },
         ],
         allowedMentions: { parse: [] },
+        ...report,
       });
+      this.store.saveTranscriptMessage(session.id, i, message.id);
     }
   }
 }

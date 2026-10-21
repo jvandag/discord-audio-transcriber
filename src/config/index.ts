@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
+import { reportsEnvironmentOverrides, reportsSchema } from '../reports/config.js';
 export const languageCodes = new Set(
   'en zh de es ru ko fr ja pt tr pl ca nl ar sv it id hi fi vi he uk el ms cs ro da hu ta no th ur hr bg lt la mi ml cy sk te fa lv bn sr az sl kn et mk br eu is hy ne mn bs kk sq sw gl mr pa si km sn yo so af oc ka be tg sd gu am yi lo uz fo ht ps tk nn mt sa lb my bo tl mg as tt haw ln ha ba jw su yue auto'.split(
     ' ',
@@ -21,6 +22,7 @@ const schema = z.object({
   maxPendingAudioMegabytes: z.number().positive().default(2048),
   transcriptionTimeoutSeconds: z.number().int().positive().default(600),
   retentionHours: z.number().positive().default(24),
+  reports: reportsSchema.prefault({}),
 });
 export type BotConfig = z.infer<typeof schema>;
 export function parseConfig(input: unknown): BotConfig {
@@ -33,9 +35,17 @@ export function parseConfig(input: unknown): BotConfig {
   return config;
 }
 export function loadConfig(): BotConfig {
-  return parseConfig(
-    JSON.parse(readFileSync(resolve(process.env.BOT_CONFIG_PATH ?? 'config/bot.json'), 'utf8')),
-  );
+  const raw = JSON.parse(
+    readFileSync(resolve(process.env.BOT_CONFIG_PATH ?? 'config/bot.json'), 'utf8'),
+  ) as Record<string, unknown>;
+  const configuredReports =
+    raw.reports && typeof raw.reports === 'object' && !Array.isArray(raw.reports)
+      ? raw.reports
+      : {};
+  return parseConfig({
+    ...raw,
+    reports: { ...configuredReports, ...reportsEnvironmentOverrides() },
+  });
 }
 export function credentials() {
   return z

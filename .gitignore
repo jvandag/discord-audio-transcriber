@@ -11,3 +11,7 @@ data/
 *.log
 *.tsbuildinfo
 .DS_Store
+credentials/
+*-credentials.json
+service-account*.json
+application_default_credentials.json

@@ -14,6 +14,62 @@ export const command = new SlashCommandBuilder()
   .addSubcommand((cmd) => cmd.setName('status').setDescription('View the current recording status'))
   .addSubcommandGroup((group) =>
     group
+      .setName('report')
+      .setDescription('Optional AI meeting reports')
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('status')
+          .setDescription('View a saved report status')
+          .addStringOption((opt) =>
+            opt
+              .setName('session')
+              .setDescription('Recording session ID from the transcript message')
+              .setRequired(true),
+          ),
+      )
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('retry')
+          .setDescription('Generate or retry a report (report editors)')
+          .addStringOption((opt) =>
+            opt.setName('session').setDescription('Recording session ID').setRequired(true),
+          ),
+      )
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('preview')
+          .setDescription('Download a report draft and its evidence')
+          .addStringOption((opt) =>
+            opt.setName('session').setDescription('Recording session ID').setRequired(true),
+          ),
+      )
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('approve')
+          .setDescription('Append a reviewed report (report editors)')
+          .addStringOption((opt) =>
+            opt.setName('session').setDescription('Recording session ID').setRequired(true),
+          ),
+      )
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('discard')
+          .setDescription('Discard an unpublished draft (report editors)')
+          .addStringOption((opt) =>
+            opt.setName('session').setDescription('Recording session ID').setRequired(true),
+          ),
+      )
+      .addSubcommand((cmd) =>
+        cmd
+          .setName('regenerate')
+          .setDescription('Regenerate a discarded draft with the latest template')
+          .addStringOption((opt) =>
+            opt.setName('session').setDescription('Recording session ID').setRequired(true),
+          ),
+      ),
+  )
+  .addSubcommandGroup((group) =>
+    group
       .setName('alias')
       .setDescription('Persistent transcript names')
       .addSubcommand((cmd) =>

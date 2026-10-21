@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import type { ReportInput, ReportJob } from '../reports/types.js';
 import type {
   AudioChunk,
   Job,
@@ -30,9 +31,66 @@ export class Store {
       CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state,session_id);
       CREATE TABLE IF NOT EXISTS segments(job_id TEXT NOT NULL REFERENCES jobs(id), ordinal INTEGER NOT NULL, user_id TEXT NOT NULL, start_ms REAL NOT NULL, end_ms REAL NOT NULL, text TEXT NOT NULL, PRIMARY KEY(job_id,ordinal));
       INSERT OR IGNORE INTO migrations VALUES(1);`);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS report_inputs(session_id TEXT PRIMARY KEY REFERENCES sessions(id), data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS reports(session_id TEXT PRIMARY KEY REFERENCES sessions(id), data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS transcript_messages(session_id TEXT NOT NULL REFERENCES sessions(id), part INTEGER NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY(session_id,part));
+      INSERT OR IGNORE INTO migrations VALUES(2);`);
   }
   close() {
     this.db.close();
+  }
+  reportInput(sessionId: string): ReportInput | undefined {
+    const row = this.db.prepare('SELECT data FROM report_inputs WHERE session_id=?').get(sessionId);
+    return row ? (JSON.parse(String(row.data)) as ReportInput) : undefined;
+  }
+  saveReportInput(input: ReportInput) {
+    this.db
+      .prepare('INSERT OR IGNORE INTO report_inputs VALUES(?,?)')
+      .run(input.sessionId, JSON.stringify(input));
+  }
+  report(sessionId: string): ReportJob | undefined {
+    const row = this.db.prepare('SELECT data FROM reports WHERE session_id=?').get(sessionId);
+    return row ? (JSON.parse(String(row.data)) as ReportJob) : undefined;
+  }
+  reports(): ReportJob[] {
+    return this.db
+      .prepare('SELECT data FROM reports ORDER BY rowid')
+      .all()
+      .map((row) => JSON.parse(String(row.data)) as ReportJob);
+  }
+  createReport(job: ReportJob): boolean {
+    return (
+      this.db
+        .prepare('INSERT OR IGNORE INTO reports VALUES(?,?)')
+        .run(job.sessionId, JSON.stringify(job)).changes === 1
+    );
+  }
+  saveReport(job: ReportJob) {
+    this.db
+      .prepare('UPDATE reports SET data=? WHERE session_id=?')
+      .run(JSON.stringify(job), job.sessionId);
+  }
+  transcriptMessage(sessionId: string, part: number): string | undefined {
+    const row = this.db
+      .prepare('SELECT message_id FROM transcript_messages WHERE session_id=? AND part=?')
+      .get(sessionId, part);
+    return row ? String(row.message_id) : undefined;
+  }
+  saveTranscriptMessage(sessionId: string, part: number, messageId: string) {
+    this.db
+      .prepare(
+        'INSERT INTO transcript_messages VALUES(?,?,?) ON CONFLICT(session_id,part) DO UPDATE SET message_id=excluded.message_id',
+      )
+      .run(sessionId, part, messageId);
+  }
+  lastTranscriptMessage(sessionId: string): string | undefined {
+    const row = this.db
+      .prepare(
+        'SELECT message_id FROM transcript_messages WHERE session_id=? ORDER BY part DESC LIMIT 1',
+      )
+      .get(sessionId);
+    return row ? String(row.message_id) : undefined;
   }
   settings(guildId: string): Settings {
     const row = this.db

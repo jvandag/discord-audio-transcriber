@@ -16,12 +16,15 @@ import type { SessionManager } from '../sessions/manager.js';
 import { canEditAlias, cleanAlias } from '../sessions/permissions.js';
 import { installedModel, normalizeModel, validateLanguage } from '../transcription/models.js';
 import { logger } from '../shared/logger.js';
+import type { ReportManager } from '../reports/manager.js';
+import { canManageReports, reportStatus } from '../reports/discord.js';
 
 export function installInteractions(
   client: Client,
   config: BotConfig,
   store: Store,
   manager: SessionManager,
+  reports?: ReportManager,
 ) {
   const editAlias = (editor: GuildMember, targetId: string, name: string) => {
     const channel = editor.voice.channel;
@@ -118,6 +121,91 @@ export function installInteractions(
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const guild = interaction.guild ?? (await client.guilds.fetch(interaction.guildId));
       const editor = await guild.members.fetch(interaction.user.id);
+      const reportButton =
+        interaction.isButton() && interaction.customId.split(':')[1]?.startsWith('report');
+      const reportCommand =
+        interaction.isChatInputCommand() && interaction.options.getSubcommandGroup() === 'report';
+      if (reportButton || reportCommand) {
+        if (!reports || !config.reports.enabled) throw new Error('Meeting reports are disabled.');
+        const parts = interaction.isButton() ? interaction.customId.split(':') : [];
+        const id = interaction.isChatInputCommand()
+          ? interaction.options.getString('session', true)
+          : parts[2];
+        if (!id) throw new Error('Unknown recording.');
+        const session = store.session(id);
+        if (session.guildId !== guild.id) throw new Error('This report belongs to another server.');
+        const channel = await guild.channels.fetch(session.channelId);
+        if (!channel?.permissionsFor(editor)?.has(PermissionFlagsBits.ViewChannel))
+          throw new Error('You cannot view this transcript’s channel.');
+        if (!canManageReports(editor, config.reports))
+          throw new Error('Manage Server or a configured report-editor role is required.');
+        const action = interaction.isChatInputCommand()
+          ? interaction.options.getSubcommand()
+          : parts[1]?.slice('report-'.length);
+        const existing = store.report(id);
+        if (parts[3] && parts[3] !== existing?.id)
+          throw new Error(
+            'These report controls are stale. Use the latest message or slash command.',
+          );
+        if (action === 'open') {
+          if (!existing?.documentUrl || existing.state !== 'published')
+            throw new Error('No published report link exists yet.');
+          await interaction.editReply({
+            content: `Weekly report log: ${existing.documentUrl}`,
+            allowedMentions: { parse: [] },
+          });
+          return;
+        }
+        if (action === 'preview') {
+          if (!existing?.rendered) throw new Error('No saved report draft exists.');
+          await interaction.editReply({
+            content: reportStatus(existing),
+            allowedMentions: { parse: [] },
+            files: [
+              { attachment: Buffer.from(existing.rendered), name: `report-${id}.txt` },
+              {
+                attachment: Buffer.from(
+                  JSON.stringify(
+                    {
+                      issues: existing.reviewIssues,
+                      draft: existing.draft,
+                      source: store.reportInput(id),
+                      template: existing.template,
+                      inputHash: existing.inputHash,
+                      usage: existing.usage,
+                    },
+                    null,
+                    2,
+                  ),
+                ),
+                name: `report-${id}-evidence.json`,
+              },
+            ],
+          });
+          return;
+        }
+        const job =
+          action === 'status'
+            ? existing
+            : action === 'retry'
+              ? reports.retry(id, editor.id)
+              : action === 'approve'
+                ? reports.approve(id, editor.id)
+                : action === 'discard'
+                  ? reports.discard(id)
+                  : action === 'regenerate'
+                    ? reports.regenerate(id, editor.id)
+                    : parts[1] === 'report'
+                      ? reports.request(id, editor.id)
+                      : undefined;
+        await interaction.editReply({
+          content: job
+            ? `${reportStatus(job)}\n\nThis is a status snapshot. Progress and the final result appear in the report message in the transcript channel.`
+            : 'No report has been requested for this session.',
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
       if (interaction.isModalSubmit()) {
         const [, action, id, target] = interaction.customId.split(':');
         if (action !== 'name' || !id || !target) throw new Error('Unknown alias form.');

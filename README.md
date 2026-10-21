@@ -36,6 +36,16 @@ npm start
 
 ## Recording a call
 
+Optional AI weekly reports support **OpenAI or Gemini**, fetching the latest format
+from one Google Doc on every generation and appending to a separate weekly-log Doc.
+Put report API keys, Google credential JSON, document URLs, and provider/model/server
+settings in the private `.env` file. See [report setup and recovery](docs/reports.md).
+The bot fills the live template's placeholders and preserves its member sections,
+nested bullets, styling and linked names. Missing members' Last Week entries begin
+with "Not present for meeting." Technical transcript metadata is removed before
+any AI request is built.
+Reporting is disabled by default and does not require changing your Whisper model.
+
 Join a normal server voice channel, then run `/transcript start`. The bot joins without deafening itself and posts a recording embed in **that voice channel's own chat**, even when the slash command was invoked elsewhere.
 
 The control message provides:

@@ -9,6 +9,7 @@ import type { TranscriptionQueue } from '../transcription/queue.js';
 import type { Session } from '../shared/types.js';
 import { installedModel, validateLanguage } from '../transcription/models.js';
 import { renderTranscript } from '../transcripts/render.js';
+import { snapshotReportInput } from '../reports/input.js';
 import { logger } from '../shared/logger.js';
 import { EmptyChannelTimer } from './empty-channel.js';
 import type { CaptureHandle, RecordingGateway } from './ports.js';
@@ -229,6 +230,7 @@ export class SessionManager {
   private async finalize(session: Session) {
     try {
       this.store.snapshotNames(session);
+      snapshotReportInput(this.store, session);
       const text = renderTranscript(
         session,
         this.store.participants(session.id),

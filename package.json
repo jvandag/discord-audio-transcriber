@@ -17,6 +17,7 @@
     "smoke:whisper": "tsx scripts/smoke-whisper.ts",
     "model:download": "tsx scripts/download-model.ts",
     "doctor": "tsx scripts/doctor.ts",
+    "doctor:reports": "tsx scripts/doctor-reports.ts",
     "retry-delivery": "tsx scripts/retry-delivery.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -28,9 +29,12 @@
   "dependencies": {
     "@discordjs/opus": "0.10.0",
     "@discordjs/voice": "0.19.2",
+    "@google/genai": "2.30.0",
     "discord.js": "14.27.0",
     "dotenv": "^17.2.3",
     "ffmpeg-static": "5.3.0",
+    "google-auth-library": "11.3.1",
+    "openai": "7.39.0",
     "pino": "^10.1.0",
     "zod": "^4.1.12"
   },
